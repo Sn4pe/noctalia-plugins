@@ -1,4 +1,15 @@
 {
+  "activity": {
+    "approved": "{actor} approved",
+    "changes": "{actor} requested changes",
+    "ci_failed": "CI failed",
+    "comment": "{actor} commented",
+    "mention": "{actor} mentioned you",
+    "review_requested": "{actor} requested your review"
+  },
+  "develop": {
+    "line": "{repo} {branch}: {count} new commits"
+  },
   "error": {
     "gh_missing": "GitHub CLI (gh) not found in PATH. Install it, then run: gh auth login",
     "parse": "Could not parse gh output",
@@ -6,11 +17,13 @@
     "truncated": "gh output was truncated"
   },
   "panel": {
+    "activity": "Activity",
     "draft": "Draft",
     "empty": "No open pull requests. All clear!",
-    "empty_no_rules": "No search rules configured. Add rules in Settings → Plugins → GitHub Pull Requests.",
+    "empty_no_rules": "No search rules configured. Add rules in Settings → Plugins → Octobar.",
     "error_title": "Couldn't fetch pull requests",
     "loading": "Loading pull requests…",
+    "mark_seen": "Mark as seen",
     "more_rows": "…and {count} more",
     "partial_warning": "{failed} of {total} rules failed: {message}",
     "retry": "Retry",
@@ -34,6 +47,14 @@
       "description": "Hide the bar widget when there are no open pull requests.",
       "label": "Hide when empty"
     },
+    "ignored_authors": {
+      "description": "Logins whose reviews and comments are not reported. * is supported. Accounts GitHub marks as bots are always ignored.",
+      "label": "Ignored authors"
+    },
+    "notify": {
+      "description": "Notify approvals, change requests, comments and CI failures on your PRs, review requests and mentions.",
+      "label": "Desktop notifications"
+    },
     "refresh_interval": {
       "description": "How often pull requests are re-fetched.",
       "label": "Refresh interval (seconds)"
@@ -41,7 +62,11 @@
     "rules": {
       "description": "One GitHub search query fragment per entry; results are merged. Each is prefixed with 'is:pr is:open' (and 'archived:false' unless you set archived: yourself). Examples: author:@me · review-requested:@me org:acme · assignee:@me -repo:acme/legacy draft:false",
       "label": "Search rules"
+    },
+    "tracked_branches": {
+      "description": "Local repository path → branch. The develop widget shows how many commits it is behind its GitHub origin. Example: ~/Projects/app → main",
+      "label": "Tracked branches"
     }
   },
-  "title": "GitHub Pull Requests"
+  "title": "Octobar"
 }

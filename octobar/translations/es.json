@@ -1,0 +1,72 @@
+{
+  "activity": {
+    "approved": "{actor} lo ha aprobado",
+    "changes": "{actor} ha pedido cambios",
+    "ci_failed": "Ha fallado el CI",
+    "comment": "{actor} ha comentado",
+    "mention": "{actor} te ha mencionado",
+    "review_requested": "{actor} te ha pedido revisión"
+  },
+  "develop": {
+    "line": "{repo} {branch}: {count} commits nuevos"
+  },
+  "error": {
+    "gh_missing": "No se encuentra GitHub CLI (gh) en el PATH. Instálalo y ejecuta: gh auth login",
+    "parse": "No se ha podido leer la salida de gh",
+    "timeout": "gh ha tardado demasiado",
+    "truncated": "La salida de gh se ha cortado"
+  },
+  "panel": {
+    "activity": "Novedades",
+    "draft": "Borrador",
+    "empty": "No hay pull requests abiertos.",
+    "empty_no_rules": "No hay reglas de búsqueda. Añádelas en Ajustes → Plugins → Octobar.",
+    "error_title": "No se han podido cargar los pull requests",
+    "loading": "Cargando pull requests…",
+    "mark_seen": "Marcar como visto",
+    "more_rows": "…y {count} más",
+    "partial_warning": "Han fallado {failed} de {total} reglas: {message}",
+    "retry": "Reintentar",
+    "review": {
+      "approved": "Aprobado",
+      "changes_requested": "Cambios pedidos",
+      "review_required": "Falta revisión"
+    },
+    "truncated_note": "…{count} resultados más sin mostrar (máximo 50 por regla)",
+    "updated_at": "Actualizado {time}"
+  },
+  "settings": {
+    "excluded_repositories": {
+      "description": "Repositorios que se ocultan. Admite *. Sin propietario casa con cualquier organización. Ejemplos: legacy-* · acme/private-*",
+      "label": "Repositorios excluidos"
+    },
+    "glyph": {
+      "label": "Icono de la barra"
+    },
+    "hide_when_zero": {
+      "description": "Oculta el widget si no hay pull requests ni novedades.",
+      "label": "Ocultar si está vacío"
+    },
+    "ignored_authors": {
+      "description": "Usuarios cuyas reviews y comentarios no se avisan. Admite *. Las cuentas que GitHub marca como bot se ignoran siempre.",
+      "label": "Autores ignorados"
+    },
+    "notify": {
+      "description": "Avisa de aprobaciones, cambios pedidos, comentarios y fallos de CI en tus PRs, de revisiones que te piden y de menciones.",
+      "label": "Notificaciones de escritorio"
+    },
+    "refresh_interval": {
+      "description": "Cada cuánto se vuelven a consultar los pull requests.",
+      "label": "Intervalo de refresco (segundos)"
+    },
+    "rules": {
+      "description": "Un fragmento de búsqueda de GitHub por entrada. Los resultados se juntan. A cada uno se le antepone 'is:pr is:open' (y 'archived:false' si no pones archived:). Ejemplos: author:@me · review-requested:@me org:acme · mentions:@me",
+      "label": "Reglas de búsqueda"
+    },
+    "tracked_branches": {
+      "description": "Ruta del repo local → rama. El widget develop muestra cuántos commits le faltan respecto a GitHub. Ejemplo: ~/Projects/app → main",
+      "label": "Ramas vigiladas"
+    }
+  },
+  "title": "Octobar"
+}

@@ -1,18 +1,19 @@
-# GitHub Pull Requests — pull requests in your bar, fetched via the gh CLI.
-# Three entries: a headless fetch service (owns all gh calls, publishes shared
-# state), a bar widget (count + status tint, click toggles the panel), and a
-# panel (PRs grouped by repo with CI status and review badges).
+# Octobar: GitHub in your bar via the gh CLI. Fork of raycursive/github-prs.
+# Four entries: a headless fetch service (owns all gh calls, publishes shared
+# state), a bar widget (PR count + unseen activity, click toggles the panel),
+# a develop widget (commits tracked local branches are behind) and a panel
+# (activity, then PRs grouped by repo with CI status and review badges).
 
-id = "raycursive/github-prs"
-name = "GitHub Pull Requests"
-version = "0.3.1"
+id = "sn4pe/octobar"
+name = "Octobar"
+version = "0.1.0"
 plugin_api = 43
-author = "raycursive"
+author = "Sn4pe"
 license = "MIT"
-dependencies = ["gh", "xdg-open"]
+dependencies = ["gh", "git", "xdg-open"]
 tags = ["bar", "development", "panel", "productivity", "service"]
 icon = "git-pull-request"
-description = "Track matching GitHub pull requests from the bar, including CI and review status, using the gh CLI."
+description = "GitHub pull requests, reviews, comments and mentions in your bar, with desktop notifications and tracked branches, using the gh CLI."
 
 # Each rule is a GitHub search query fragment; the service prefixes it with
 # "is:pr is:open" (and "archived:false" unless the rule mentions archived:).
@@ -29,6 +30,29 @@ type = "string_list"
 label_key = "settings.excluded_repositories.label"
 description_key = "settings.excluded_repositories.description"
 default = []
+
+# Reviewers whose activity is not reported, e.g. CI bots that post as users.
+[[setting]]
+key = "ignored_authors"
+type = "string_list"
+label_key = "settings.ignored_authors.label"
+description_key = "settings.ignored_authors.description"
+default = []
+
+[[setting]]
+key = "notify"
+type = "bool"
+label_key = "settings.notify.label"
+description_key = "settings.notify.description"
+default = true
+
+# Local path -> branch; the develop widget counts the commits it is behind.
+[[setting]]
+key = "tracked_branches"
+type = "string_map"
+label_key = "settings.tracked_branches.label"
+description_key = "settings.tracked_branches.description"
+default = {}
 
 [[setting]]
 key = "refresh_interval"
@@ -62,7 +86,11 @@ entry = "bar.luau"
   description_key = "settings.hide_when_zero.description"
   default = false
 
-# Open with the bar widget click, or: noctalia msg panel-toggle raycursive/github-prs:panel
+[[widget]]
+id = "develop"
+entry = "develop.luau"
+
+# Open with the bar widget click, or: noctalia msg panel-toggle sn4pe/octobar:panel
 [[panel]]
 id = "panel"
 entry = "panel.luau"

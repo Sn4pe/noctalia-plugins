@@ -1,6 +1,6 @@
 --!nonstrict
--- [[panel]] entry: pull requests grouped by repository, rendered from the
--- shared state the fetch service publishes. Each pull request uses two lines so
+-- [[panel]] entry: unseen activity on top, then pull requests grouped by
+-- repository, rendered from the shared state the fetch service publishes. Each pull request uses two lines so
 -- long titles cannot collide with the author or status badges; clicking the
 -- title opens the PR in the browser. The header carries the last-refresh time,
 -- an icon-only refresh action, and a close button.
@@ -17,6 +17,15 @@ local CI_APPEARANCE = {
 }
 local CI_NONE = { glyph = "circle-dashed", color = "on_surface_variant" }
 
+local ACTIVITY_GLYPH = {
+  approved = { glyph = "circle-check", color = "primary" },
+  changes = { glyph = "alert-circle", color = "error" },
+  comment = { glyph = "message", color = "tertiary" },
+  mention = { glyph = "at", color = "tertiary" },
+  review_requested = { glyph = "eye", color = "tertiary" },
+  ci_failed = { glyph = "circle-x", color = "error" },
+}
+
 local REVIEW_BADGE = {
   APPROVED = { key = "panel.review.approved", color = "primary" },
   CHANGES_REQUESTED = { key = "panel.review.changes_requested", color = "error" },
@@ -24,6 +33,7 @@ local REVIEW_BADGE = {
 }
 
 local prs = {}
+local activity = {}
 local fetchStatus = "loading"
 local errorMessage = ""
 local lastUpdatedText = ""
@@ -38,6 +48,7 @@ local tr = noctalia.tr
 
 local function syncFromState()
   prs = noctalia.state.get("prs")
+  activity = noctalia.state.get("activity") or {}
   fetchStatus = noctalia.state.get("fetch_status")
   errorMessage = noctalia.state.get("error_message")
   lastUpdatedText = noctalia.state.get("last_updated_text")
@@ -67,6 +78,64 @@ local function badge(text, color, fillAlpha)
   }, {
     ui.label({ text = text, fontSize = 11, fontWeight = "medium", color = color }),
   })
+end
+
+local function openUrl(url)
+  noctalia.runAsync({ "xdg-open", url })
+end
+
+local function activityRow(entry)
+  local look = ACTIVITY_GLYPH[entry.kind] or ACTIVITY_GLYPH.comment
+  return ui.column({ key = entry.url, gap = 2, paddingH = 10, paddingV = 6, align = "stretch" }, {
+    ui.row({ gap = 9, align = "center" }, {
+      ui.glyph({ name = look.glyph, size = 15, color = look.color }),
+      ui.button({
+        key = `open:{entry.url}`,
+        text = `{entry.repo}#{entry.number} {entry.title}`,
+        variant = "ghost",
+        contentAlign = "start",
+        flexGrow = 1,
+        onClick = function()
+          openUrl(entry.url)
+        end,
+      }),
+    }),
+    ui.row({ paddingH = 24 }, {
+      ui.label({
+        text = tr("activity." .. entry.kind, { actor = entry.actor }),
+        fontSize = 11,
+        color = "on_surface_variant",
+      }),
+    }),
+  })
+end
+
+local function activitySection()
+  local children = {
+    ui.row({ gap = 8, align = "center", paddingH = 11, paddingV = 6 }, {
+      ui.glyph({ name = "bell", size = 16, color = "primary" }),
+      ui.label({ text = tr("panel.activity"), fontSize = 13, fontWeight = "bold", color = "primary", flexGrow = 1 }),
+      ui.button({
+        text = tr("panel.mark_seen"),
+        variant = "ghost",
+        onClick = function()
+          noctalia.state.set("ack_requested", (noctalia.state.get("ack_requested") or 0) + 1)
+        end,
+      }),
+    }),
+  }
+  for _, entry in ipairs(activity) do
+    table.insert(children, ui.separator({ thickness = 1, color = "outline_variant/0.28", spacing = 0 }))
+    table.insert(children, activityRow(entry))
+  end
+  return ui.column({
+    key = "activity",
+    fill = "surface_container/0.10",
+    border = "outline_variant/0.40",
+    borderWidth = 1,
+    radius = 11,
+    align = "stretch",
+  }, children)
 end
 
 local function prRow(pr)
@@ -101,8 +170,7 @@ local function prRow(pr)
         contentAlign = "start",
         flexGrow = 1,
         onClick = function()
-          local url = "'" .. pr.url:gsub("'", "'\\''") .. "'"
-          noctalia.runAsync("xdg-open " .. url)
+          openUrl(pr.url)
         end,
       }),
     }),
@@ -195,7 +263,7 @@ local function groupedRows()
 end
 
 local function body()
-  if #prs == 0 then
+  if #prs == 0 and #activity == 0 then
     if fetchStatus == "loading" then
       return ui.column(CENTERED_LAYOUT, {
         ui.label({ text = tr("panel.loading"), color = "on_surface_variant" }),
@@ -219,7 +287,11 @@ local function body()
       ui.label({ text = tr(emptyKey), color = "on_surface_variant", textAlign = "center" }),
     })
   end
-  return ui.scroll({ flexGrow = 1, gap = 10, align = "stretch" }, groupedRows())
+  local rows = groupedRows()
+  if #activity > 0 then
+    table.insert(rows, 1, activitySection())
+  end
+  return ui.scroll({ flexGrow = 1, gap = 10, align = "stretch" }, rows)
 end
 
 render = function()
@@ -262,6 +334,12 @@ render = function()
 end
 
 noctalia.state.watch("fetch_status", function()
+  syncFromState()
+  render()
+end)
+
+-- Marking activity as seen changes it without a new fetch.
+noctalia.state.watch("activity", function()
   syncFromState()
   render()
 end)
