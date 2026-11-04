@@ -1,7 +1,7 @@
 # Octobar: GitHub in your bar via the gh CLI. Fork of raycursive/github-prs.
-# Four entries: a headless fetch service (owns all gh calls, publishes shared
-# state), a bar widget (PR count + unseen activity, click toggles the panel),
-# a develop widget (commits tracked local branches are behind) and a panel
+# Three entries: a headless fetch service (owns all gh calls, publishes shared
+# state), a bar widget (PR count, unseen activity and commits tracked local
+# branches are behind; click toggles the panel), and a panel
 # (activity, then PRs grouped by repo with CI status and review badges).
 
 id = "sn4pe/octobar"
@@ -46,7 +46,15 @@ label_key = "settings.notify.label"
 description_key = "settings.notify.description"
 default = true
 
-# Local path -> branch; the develop widget counts the commits it is behind.
+# Needs notify-send (libnotify) on PATH.
+[[setting]]
+key = "clickable_notifications"
+type = "bool"
+label_key = "settings.clickable_notifications.label"
+description_key = "settings.clickable_notifications.description"
+default = false
+
+# Local path -> branch; the bar widget counts the commits it is behind.
 [[setting]]
 key = "tracked_branches"
 type = "string_map"
@@ -85,10 +93,6 @@ entry = "bar.luau"
   label_key = "settings.hide_when_zero.label"
   description_key = "settings.hide_when_zero.description"
   default = false
-
-[[widget]]
-id = "develop"
-entry = "develop.luau"
 
 # Open with the bar widget click, or: noctalia msg panel-toggle sn4pe/octobar:panel
 [[panel]]

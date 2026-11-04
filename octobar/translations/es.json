@@ -7,6 +7,14 @@
     "mention": "{actor} te ha mencionado",
     "review_requested": "{actor} te ha pedido revisión"
   },
+  "bar": {
+    "approved": "{count} aprobados",
+    "changes_requested": "{count} con cambios pedidos",
+    "error": "Ha fallado la última consulta",
+    "failing": "{count} con el CI roto",
+    "prs": "{count} PRs",
+    "requested": "{count} te toca revisar"
+  },
   "develop": {
     "line": "{repo} {branch}: {count} commits nuevos"
   },
@@ -16,8 +24,13 @@
     "timeout": "gh ha tardado demasiado",
     "truncated": "La salida de gh se ha cortado"
   },
+  "notification": {
+    "open": "Abrir"
+  },
   "panel": {
     "activity": "Novedades",
+    "branches": "Ramas por actualizar",
+    "compare": "Comparar",
     "draft": "Borrador",
     "empty": "No hay pull requests abiertos.",
     "empty_no_rules": "No hay reglas de búsqueda. Añádelas en Ajustes → Plugins → Octobar.",
@@ -30,12 +43,18 @@
     "review": {
       "approved": "Aprobado",
       "changes_requested": "Cambios pedidos",
+      "partial": "{approved}/{total} aprobado",
+      "requested_you": "Te toca revisar",
       "review_required": "Falta revisión"
     },
     "truncated_note": "…{count} resultados más sin mostrar (máximo 50 por regla)",
     "updated_at": "Actualizado {time}"
   },
   "settings": {
+    "clickable_notifications": {
+      "description": "Al pulsar una notificación se abre la revisión o el comentario. Necesita notify-send (libnotify).",
+      "label": "Notificaciones clicables"
+    },
     "excluded_repositories": {
       "description": "Repositorios que se ocultan. Admite *. Sin propietario casa con cualquier organización. Ejemplos: legacy-* · acme/private-*",
       "label": "Repositorios excluidos"
@@ -64,7 +83,7 @@
       "label": "Reglas de búsqueda"
     },
     "tracked_branches": {
-      "description": "Ruta del repo local → rama. El widget develop muestra cuántos commits le faltan respecto a GitHub. Ejemplo: ~/Projects/app → main",
+      "description": "Ruta del repo local y rama. La barra muestra cuántos commits le faltan respecto a GitHub y el panel los lista. Ejemplo: ~/Projects/app = main",
       "label": "Ramas vigiladas"
     }
   },

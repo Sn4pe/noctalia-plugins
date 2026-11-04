@@ -10,14 +10,16 @@
 -- is behind its GitHub counterpart. See the state contract below.
 --
 -- State keys published:
---   prs                array of { number, title, url, repo, author, isDraft,
---                      reviewDecision, ci, updatedAt } — nulls normalized to ""
---   counts             { total, failing, pending, approved, changes_requested, drafts }
+--   prs                array of { number, title, url, headRefName, repo, author, isDraft,
+--                      reviewDecision, approvals, reviewers, reviewRequested, mine,
+--                      ci, updatedAt } — nulls normalized to ""
+--   counts             { total, failing, pending, approved, changes_requested, drafts,
+--                      requested }
 --   activity           array of { url, prUrl, repo, number, title, kind, actor,
 --                      createdAt }, newest first, until acknowledged.
 --                      kind: "approved" | "changes" | "comment" | "mention" |
 --                      "review_requested" | "ci_failed"
---   branches           array of { repo, branch, behind, url }
+--   branches           array of { repo, branch, behind, commits, url }
 --   error_message      "" when healthy; full-failure error or partial warning
 --   last_updated_text  preformatted "HH:MM" of the last successful merge
 --   rules_count        number of configured rules (panel empty-state hint)
@@ -27,6 +29,7 @@
 -- State keys consumed:
 --   refresh_requested  monotonic nonce bumped by the panel's refresh button
 --   ack_requested      monotonic nonce bumped by the panel's "mark seen" button
+--   ack_url            url of the activity entry the panel just opened
 
 local GH_TIMEOUT_MS = 30000
 local DEFAULT_INTERVAL_S = 180
@@ -39,7 +42,7 @@ local SINCE_OVERLAP_S = 120
 
 -- Single line and free of single quotes, so argument quoting stays trivial.
 local GRAPHQL_QUERY =
-  "query($q: String!, $since: DateTime!) { viewer { login } search(query: $q, type: ISSUE, first: 50) { issueCount nodes { ... on PullRequest { number title url isDraft reviewDecision updatedAt repository { nameWithOwner } author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } timelineItems(since: $since, last: 20, itemTypes: [PULL_REQUEST_REVIEW, ISSUE_COMMENT]) { nodes { __typename ... on PullRequestReview { state createdAt url bodyText author { __typename login } } ... on IssueComment { createdAt url bodyText author { __typename login } } } } } } } }"
+  "query($q: String!, $since: DateTime!) { viewer { login } search(query: $q, type: ISSUE, first: 50) { issueCount nodes { ... on PullRequest { number title url headRefName isDraft reviewDecision reviewRequests { totalCount } latestReviews(first: 10) { nodes { state author { __typename login } } } updatedAt repository { nameWithOwner } author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } timelineItems(since: $since, last: 20, itemTypes: [PULL_REQUEST_REVIEW, ISSUE_COMMENT]) { nodes { __typename ... on PullRequestReview { state createdAt url bodyText author { __typename login } } ... on IssueComment { createdAt url bodyText author { __typename login } } } } } } } }"
 
 -- Projects the response down to plain PR records and normalizes the nullable
 -- fields (ghost author, no review decision, no CI checks) to "" so Luau never
@@ -47,8 +50,10 @@ local GRAPHQL_QUERY =
 -- fragment spread. .count keeps the raw issueCount for the overflow note.
 -- Events drop the viewer's own actions, bots and pending/dismissed reviews;
 -- comment bodies are reduced to a mention flag so stdout stays small.
+-- reviewDecision is recomputed per reviewer: GitHub reports APPROVED once the
+-- required count is met, even while other requested reviewers are pending.
 local JQ_PROJECTION =
-  '.data.viewer.login as $me | {count: .data.search.issueCount, viewer: $me, items: [.data.search.nodes[] | select(.url != null) | {number, title, url, isDraft, updatedAt, repo: .repository.nameWithOwner, author: (.author.login // ""), reviewDecision: (.reviewDecision // ""), ci: (.commits.nodes[0].commit.statusCheckRollup.state // ""), events: [.timelineItems.nodes[] | select(.author != null and .author.__typename != "Bot" and .author.login != $me and .state != "PENDING" and .state != "DISMISSED") | {review: (.__typename == "PullRequestReview"), state: (.state // ""), url, createdAt, actor: .author.login, mention: ((.bodyText // "") | ascii_downcase | contains("@" + ($me | ascii_downcase)))}]}]}'
+  '.data.viewer.login as $me | {count: .data.search.issueCount, viewer: $me, items: [.data.search.nodes[] | select(.url != null) | (.author.login // "") as $a | [.latestReviews.nodes[] | select(.author != null and .author.__typename != "Bot" and .author.login != $a and (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "COMMENTED"))] as $r | ([$r[] | select(.state == "APPROVED")] | length) as $ok | (($r | length) + (.reviewRequests.totalCount // 0)) as $all | {number, title, url, headRefName: (.headRefName // ""), isDraft, updatedAt, repo: .repository.nameWithOwner, author: $a, reviewDecision: (if any($r[]; .state == "CHANGES_REQUESTED") then "CHANGES_REQUESTED" elif $ok > 0 and $ok == $all then "APPROVED" elif $ok > 0 then "PARTIALLY_APPROVED" else (.reviewDecision // "") end), approvals: $ok, reviewers: $all, ci: (.commits.nodes[0].commit.statusCheckRollup.state // ""), events: [.timelineItems.nodes[] | select(.author != null and .author.__typename != "Bot" and .author.login != $me and .state != "PENDING" and .state != "DISMISSED") | {review: (.__typename == "PullRequestReview"), state: (.state // ""), url, createdAt, actor: .author.login, mention: ((.bodyText // "") | ascii_downcase | contains("@" + ($me | ascii_downcase)))}]}]}'
 
 -- Positional args: $1 local path, $2 branch. Prints one JSON record.
 local BRANCH_SCRIPT = [[
@@ -56,8 +61,9 @@ set -e
 cd "$1"
 sha=$(git rev-parse "$2")
 slug=$(git remote get-url origin | sed -E 's#(\.git)?/*$##; s#^.*github\.com[:/]##')
-behind=$(gh api "repos/$slug/compare/$sha...$2" --jq .ahead_by)
-printf '{"repo":"%s","branch":"%s","behind":%s,"url":"https://github.com/%s/compare/%s...%s"}' "$slug" "$2" "$behind" "$slug" "$sha" "$2"
+# Same call also returns the newest 10 missing commits for the panel.
+out=$(gh api "repos/$slug/compare/$sha...$2" --jq '"\(.ahead_by) \([.commits[-10:][] | {sha: .sha[0:7], message: (.commit.message | split("\n")[0]), author: (.author.login // .commit.author.name), url: .html_url}] | reverse | tojson)"')
+printf '{"repo":"%s","branch":"%s","behind":%s,"commits":%s,"url":"https://github.com/%s/compare/%s...%s"}' "$slug" "$2" "${out%% *}" "${out#* }" "$slug" "$sha" "$2"
 ]]
 
 local fetching = false
@@ -81,6 +87,7 @@ local function rateLimited()
 end
 
 local activityFile = noctalia.pluginDataDir() .. "/activity.json"
+local prsFile = noctalia.pluginDataDir() .. "/prs.json"
 -- since: ISO timestamp the next query starts from. seen: event url -> createdAt.
 local activity = { since = nil, seen = {}, events = {} }
 
@@ -270,11 +277,18 @@ local function classifyEvent(event, pr, viewer)
   return "comment"
 end
 
+-- Detached so the click still works after the service timeout or from the
+-- notification history: notify-send waits for the action, the shell opens it.
+local CLICKABLE_SCRIPT = 'a=$(notify-send -a octobar -A default="$4" "$1" "$2") && [ "$a" = default ] && { noctalia msg plugin sn4pe/octobar:fetch all ack "$3" >/dev/null 2>&1; exec xdg-open "$3"; }'
+
 local function notifyEvent(entry)
-  noctalia.notify(
-    `{entry.repo}#{entry.number}`,
-    noctalia.tr("activity." .. entry.kind, { actor = entry.actor }) .. "\n" .. entry.title
-  )
+  local title = `{entry.repo}#{entry.number}`
+  local body = noctalia.tr("activity." .. entry.kind, { actor = entry.actor }) .. "\n" .. entry.title
+  if noctalia.getConfig("clickable_notifications") == true then
+    noctalia.runAsync({ "setsid", "-f", "sh", "-c", CLICKABLE_SCRIPT, "sh", title, body, entry.url, noctalia.tr("notification.open") })
+  else
+    noctalia.notify(title, body)
+  end
 end
 
 local function entryFor(pr, kind, actor, url, createdAt)
@@ -423,7 +437,7 @@ local function fetchBranches()
 end
 
 local function computeCounts(prs)
-  local counts = { total = #prs, failing = 0, pending = 0, approved = 0, changes_requested = 0, drafts = 0 }
+  local counts = { total = #prs, failing = 0, pending = 0, approved = 0, changes_requested = 0, drafts = 0, requested = 0 }
   for _, pr in ipairs(prs) do
     if pr.ci == "FAILURE" or pr.ci == "ERROR" then
       counts.failing += 1
@@ -438,6 +452,9 @@ local function computeCounts(prs)
     if pr.isDraft then
       counts.drafts += 1
     end
+    if pr.reviewRequested then
+      counts.requested += 1
+    end
   end
   return counts
 end
@@ -450,6 +467,9 @@ local function publish(prs, status, errorMessage, overflow, rulesCount, updateTi
   noctalia.state.set("rules_count", rulesCount)
   if updateTimestamp then
     noctalia.state.set("last_updated_text", noctalia.formatTime("%H:%M"))
+    -- For other tools (e.g. a Jira widget linking tickets to PRs) without extra API calls.
+    noctalia.mkdirAll(noctalia.pluginDataDir())
+    noctalia.writeFile(prsFile, noctalia.json.encode({ updatedAt = os.time(), prs = prs }))
   end
   noctalia.state.set("error_message", errorMessage)
   noctalia.state.set("fetch_status", status)
@@ -495,6 +515,9 @@ local function mergeAndPublish(ruleResults, ruleErrors, rulesCount, excludedRepo
     for _, pr in ipairs(decoded.activityOnly and {} or decoded.items) do
       if not seen[pr.url] and not repositoryExcluded(pr.repo, excludedRepositories) then
         seen[pr.url] = true
+        -- reviewDecision stays APPROVED after a re-request, so the review-requested rule wins.
+        pr.reviewRequested = requestedUrls ~= nil and requestedUrls[pr.url] == true
+        pr.mine = pr.author == viewer
         table.insert(prs, pr)
       end
     end
@@ -641,6 +664,22 @@ noctalia.state.watch("refresh_requested", function(value)
   end
 end)
 
+local function ackEntry(url)
+  for i = #activity.events, 1, -1 do
+    if activity.events[i].url == url then
+      table.remove(activity.events, i)
+    end
+  end
+  saveActivity()
+  noctalia.state.set("activity", activity.events)
+end
+
+noctalia.state.watch("ack_url", function(value)
+  if type(value) == "string" and value ~= "" then
+    ackEntry(value)
+  end
+end)
+
 noctalia.state.watch("ack_requested", function(value)
   local nonce = tonumber(value) or 0
   if nonce ~= lastAckNonce then
@@ -667,9 +706,11 @@ function onConfigChanged()
   fetchBranches()
 end
 
-function onIpc(event, _payload)
+function onIpc(event, payload)
   if event == "refresh" then
     restartFetch()
+  elseif event == "ack" then
+    ackEntry(payload)
   elseif event == "dump" then
     local summary = {
       status = noctalia.state.get("fetch_status"),

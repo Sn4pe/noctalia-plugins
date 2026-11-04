@@ -7,6 +7,14 @@
     "mention": "{actor} mentioned you",
     "review_requested": "{actor} requested your review"
   },
+  "bar": {
+    "approved": "{count} approved",
+    "changes_requested": "{count} with changes requested",
+    "error": "Last refresh failed",
+    "failing": "{count} with CI failing",
+    "prs": "{count} PRs",
+    "requested": "{count} waiting for your review"
+  },
   "develop": {
     "line": "{repo} {branch}: {count} new commits"
   },
@@ -16,8 +24,13 @@
     "timeout": "gh timed out",
     "truncated": "gh output was truncated"
   },
+  "notification": {
+    "open": "Open"
+  },
   "panel": {
     "activity": "Activity",
+    "branches": "Branches behind",
+    "compare": "Compare",
     "draft": "Draft",
     "empty": "No open pull requests. All clear!",
     "empty_no_rules": "No search rules configured. Add rules in Settings → Plugins → Octobar.",
@@ -30,12 +43,18 @@
     "review": {
       "approved": "Approved",
       "changes_requested": "Changes requested",
+      "partial": "{approved}/{total} approved",
+      "requested_you": "Your review",
       "review_required": "Review needed"
     },
     "truncated_note": "…{count} more matches not shown (per-rule cap is 50)",
     "updated_at": "Updated {time}"
   },
   "settings": {
+    "clickable_notifications": {
+      "description": "Clicking a notification opens the review or comment. Needs notify-send (libnotify).",
+      "label": "Clickable notifications"
+    },
     "excluded_repositories": {
       "description": "Repository names to hide after fetching. * is supported; names without an owner match every organization. Examples: legacy-* · acme/private-*",
       "label": "Excluded repositories"
@@ -64,7 +83,7 @@
       "label": "Search rules"
     },
     "tracked_branches": {
-      "description": "Local repository path → branch. The develop widget shows how many commits it is behind its GitHub origin. Example: ~/Projects/app → main",
+      "description": "Local repository path to branch. The bar shows how many commits it is behind GitHub, and the panel lists them. Example: ~/Projects/app = main",
       "label": "Tracked branches"
     }
   },
