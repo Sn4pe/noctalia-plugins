@@ -279,13 +279,22 @@ end
 
 -- Detached so the click still works after the service timeout or from the
 -- notification history: notify-send waits for the action, the shell opens it.
-local CLICKABLE_SCRIPT = 'a=$(notify-send -a octobar -A default="$4" "$1" "$2") && [ "$a" = default ] && { noctalia msg plugin sn4pe/octobar:fetch all ack "$3" >/dev/null 2>&1; exec xdg-open "$3"; }'
+local CLICKABLE_SCRIPT = 'a=$(notify-send -a octobar -u "$5" -c "$6" -A default="$4" "$1" "$2") && [ "$a" = default ] && { noctalia msg plugin sn4pe/octobar:fetch all ack "$3" >/dev/null 2>&1; exec xdg-open "$3"; }'
+
+-- Entries that need action from you. They go out as critical with category
+-- octobar.alert, so a notification filter can match them.
+local ALERT_KINDS = { review_requested = true, changes = true, ci_failed = true }
 
 local function notifyEvent(entry)
   local title = `{entry.repo}#{entry.number}`
   local body = noctalia.tr("activity." .. entry.kind, { actor = entry.actor }) .. "\n" .. entry.title
   if noctalia.getConfig("clickable_notifications") == true then
-    noctalia.runAsync({ "setsid", "-f", "sh", "-c", CLICKABLE_SCRIPT, "sh", title, body, entry.url, noctalia.tr("notification.open") })
+    local alert = ALERT_KINDS[entry.kind] == true
+    noctalia.runAsync({
+      "setsid", "-f", "sh", "-c", CLICKABLE_SCRIPT, "sh",
+      title, body, entry.url, noctalia.tr("notification.open"),
+      alert and "critical" or "normal", alert and "octobar.alert" or "octobar",
+    })
   else
     noctalia.notify(title, body)
   end
